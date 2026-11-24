@@ -20,12 +20,15 @@ import com.example.paybacktracker.ui.theme.Slate600
 @Composable
 fun BalanceBadge(
     balance: Double,
+    profitText: String = "В плюсе",
+    lossText: String = "В минусе",
+    zeroText: String = "В нуле",
     modifier: Modifier = Modifier
 ) {
     val (text, bgColor, textColor) = when {
-        balance > 0 -> Triple("В плюсе", GreenLight, GreenPrimary)
-        balance < 0 -> Triple("В минусе", RedLight, RedPrimary)
-        else -> Triple("В нуле", Slate200, Slate600)
+        balance > 0 -> Triple(profitText, GreenLight, GreenPrimary)
+        balance < 0 -> Triple(lossText, RedLight, RedPrimary)
+        else -> Triple(zeroText, Slate200, Slate600)
     }
 
     Text(

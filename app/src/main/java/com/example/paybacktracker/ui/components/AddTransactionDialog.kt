@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,7 +32,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.paybacktracker.data.entity.TransactionType
@@ -44,11 +41,15 @@ import com.example.paybacktracker.ui.theme.RedLight
 import com.example.paybacktracker.ui.theme.RedPrimary
 import com.example.paybacktracker.ui.theme.Slate200
 import com.example.paybacktracker.ui.theme.Slate500
-import com.example.paybacktracker.ui.theme.Slate900
 
 @Composable
 fun AddTransactionDialog(
     initialType: TransactionType = TransactionType.EXPENSE,
+    spentLabel: String = "Потратил",
+    receivedLabel: String = "Получил",
+    amountLabel: String = "Сумма",
+    cancelLabel: String = "Отмена",
+    errorMessageText: String = "Введите корректную сумму больше нуля",
     onDismiss: () -> Unit,
     onConfirm: (amount: Double, type: TransactionType) -> Unit
 ) {
@@ -66,7 +67,7 @@ fun AddTransactionDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (selectedType == TransactionType.EXPENSE) "Расход" else "Доход",
+                text = if (selectedType == TransactionType.EXPENSE) spentLabel else receivedLabel,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -76,12 +77,11 @@ fun AddTransactionDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Segmented control to switch between Expense and Income
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Slate200)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -98,7 +98,7 @@ fun AddTransactionDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Потратил",
+                            text = spentLabel,
                             color = if (isExpense) RedPrimary else Slate500,
                             fontWeight = if (isExpense) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 15.sp
@@ -115,7 +115,7 @@ fun AddTransactionDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Получил",
+                            text = receivedLabel,
                             color = if (isIncome) GreenPrimary else Slate500,
                             fontWeight = if (isIncome) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 15.sp
@@ -123,7 +123,6 @@ fun AddTransactionDialog(
                     }
                 }
 
-                // Numeric input field
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { input ->
@@ -136,7 +135,7 @@ fun AddTransactionDialog(
                             }
                         }
                     },
-                    label = { Text("Сумма") },
+                    label = { Text(amountLabel) },
                     placeholder = { Text("0") },
                     trailingIcon = {
                         Text(
@@ -171,7 +170,7 @@ fun AddTransactionDialog(
                     val parsed = amountText.toDoubleOrNull()
                     if (parsed == null || parsed <= 0) {
                         isError = true
-                        errorMessage = "Введите корректную сумму больше нуля"
+                        errorMessage = errorMessageText
                     } else {
                         onConfirm(parsed, selectedType)
                     }
@@ -182,14 +181,14 @@ fun AddTransactionDialog(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = if (selectedType == TransactionType.EXPENSE) "+ Потратил" else "+ Получил",
+                    text = if (selectedType == TransactionType.EXPENSE) "+ $spentLabel" else "+ $receivedLabel",
                     fontWeight = FontWeight.SemiBold
                 )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(cancelLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         shape = RoundedCornerShape(20.dp),

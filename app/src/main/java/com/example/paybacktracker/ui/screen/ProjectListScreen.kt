@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -60,12 +61,15 @@ import com.example.paybacktracker.ui.theme.Slate600
 import com.example.paybacktracker.ui.theme.Slate900
 import com.example.paybacktracker.ui.viewmodel.ProjectListViewModel
 import com.example.paybacktracker.util.CurrencyFormatter
+import com.example.paybacktracker.util.StringsBundle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectListScreen(
     viewModel: ProjectListViewModel,
-    onProjectClick: (projectId: Long) -> Unit
+    strings: StringsBundle,
+    onProjectClick: (projectId: Long) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val projects by viewModel.projects.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -74,11 +78,27 @@ fun ProjectListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Проекты",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = strings.projectsTitle,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = strings.projectsSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = strings.settings,
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -89,13 +109,13 @@ fun ProjectListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.openCreateDialog() },
-                containerColor = Slate900,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Создать проект",
+                    contentDescription = strings.newProject,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -109,6 +129,7 @@ fun ProjectListScreen(
         ) {
             if (projects.isEmpty()) {
                 EmptyProjectsState(
+                    strings = strings,
                     onAddClick = { viewModel.openCreateDialog() },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -121,12 +142,12 @@ fun ProjectListScreen(
                     items(projects, key = { it.id }) { project ->
                         ProjectCard(
                             project = project,
+                            strings = strings,
                             onClick = { onProjectClick(project.id) },
                             onRename = { viewModel.openRenameDialog(project) },
                             onDelete = { viewModel.openDeleteDialog(project) }
                         )
                     }
-                    // Bottom spacing for FAB
                     item {
                         Spacer(modifier = Modifier.height(72.dp))
                     }
@@ -138,8 +159,8 @@ fun ProjectListScreen(
     // Create Project Dialog
     if (uiState.isCreateDialogOpen) {
         AddEditProjectDialog(
-            title = "Новый проект",
-            confirmButtonText = "Создать",
+            title = strings.newProject,
+            confirmButtonText = strings.create,
             onDismiss = { viewModel.dismissCreateDialog() },
             onConfirm = { name -> viewModel.createProject(name) }
         )
@@ -149,8 +170,8 @@ fun ProjectListScreen(
     uiState.projectToRename?.let { project ->
         AddEditProjectDialog(
             initialName = project.name,
-            title = "Переименовать проект",
-            confirmButtonText = "Сохранить",
+            title = strings.renameProject,
+            confirmButtonText = strings.save,
             onDismiss = { viewModel.dismissRenameDialog() },
             onConfirm = { newName -> viewModel.renameProject(project.id, newName) }
         )
@@ -159,9 +180,9 @@ fun ProjectListScreen(
     // Delete Confirmation Dialog
     uiState.projectToDelete?.let { project ->
         DeleteConfirmationDialog(
-            title = "Удалить «${project.name}»?",
-            message = "Все сохранённые суммы (доходы и расходы) по этому проекту будут удалены без возможности восстановления.",
-            confirmButtonText = "Удалить",
+            title = strings.deleteConfirmTitle(project.name),
+            message = strings.deleteConfirmMessage,
+            confirmButtonText = strings.delete,
             onDismiss = { viewModel.dismissDeleteDialog() },
             onConfirm = { viewModel.confirmDelete() }
         )
@@ -171,6 +192,7 @@ fun ProjectListScreen(
 @Composable
 fun ProjectCard(
     project: ProjectWithStats,
+    strings: StringsBundle,
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit
@@ -182,7 +204,7 @@ fun ProjectCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, BorderColor),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -208,7 +230,7 @@ fun ProjectCard(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Действия",
+                            contentDescription = "Menu",
                             tint = Slate400
                         )
                     }
@@ -218,7 +240,7 @@ fun ProjectCard(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Переименовать") },
+                            text = { Text(strings.rename) },
                             leadingIcon = {
                                 Icon(Icons.Default.Edit, contentDescription = null)
                             },
@@ -228,7 +250,7 @@ fun ProjectCard(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Удалить", color = RedPrimary) },
+                            text = { Text(strings.delete, color = RedPrimary) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Default.Delete,
@@ -255,9 +277,9 @@ fun ProjectCard(
             ) {
                 Column {
                     Text(
-                        text = "Баланс",
+                        text = strings.balance,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Slate500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = CurrencyFormatter.formatBalance(project.balance),
@@ -267,7 +289,12 @@ fun ProjectCard(
                     )
                 }
 
-                BalanceBadge(balance = project.balance)
+                BalanceBadge(
+                    balance = project.balance,
+                    profitText = strings.statusInProfit,
+                    lossText = strings.statusInLoss,
+                    zeroText = strings.statusInZero
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -278,14 +305,14 @@ fun ProjectCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Потрачено: ${CurrencyFormatter.formatAmount(project.totalExpense)}",
+                    text = "${strings.spent}: ${CurrencyFormatter.formatAmount(project.totalExpense)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate600
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Получено: ${CurrencyFormatter.formatAmount(project.totalIncome)}",
+                    text = "${strings.received}: ${CurrencyFormatter.formatAmount(project.totalIncome)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate600
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -294,6 +321,7 @@ fun ProjectCard(
 
 @Composable
 fun EmptyProjectsState(
+    strings: StringsBundle,
     onAddClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -310,14 +338,14 @@ fun EmptyProjectsState(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Нет проектов",
+            text = strings.emptyProjectsTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = Slate900
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Нажмите «+», чтобы создать первый проект и начать вести учёт окупаемости.",
+            text = strings.emptyProjectsDesc,
             style = MaterialTheme.typography.bodyMedium,
             color = Slate500,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center

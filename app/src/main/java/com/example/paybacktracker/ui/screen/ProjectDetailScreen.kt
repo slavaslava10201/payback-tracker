@@ -64,18 +64,19 @@ import com.example.paybacktracker.ui.theme.GreenLight
 import com.example.paybacktracker.ui.theme.GreenPrimary
 import com.example.paybacktracker.ui.theme.RedLight
 import com.example.paybacktracker.ui.theme.RedPrimary
-import com.example.paybacktracker.ui.theme.Slate100
 import com.example.paybacktracker.ui.theme.Slate400
 import com.example.paybacktracker.ui.theme.Slate500
 import com.example.paybacktracker.ui.theme.Slate600
 import com.example.paybacktracker.ui.theme.Slate900
 import com.example.paybacktracker.ui.viewmodel.ProjectDetailViewModel
 import com.example.paybacktracker.util.CurrencyFormatter
+import com.example.paybacktracker.util.StringsBundle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectDetailScreen(
     viewModel: ProjectDetailViewModel,
+    strings: StringsBundle,
     onBack: () -> Unit
 ) {
     val project by viewModel.project.collectAsState()
@@ -89,7 +90,7 @@ fun ProjectDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = project?.name ?: "Проект",
+                        text = project?.name ?: "...",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -98,8 +99,8 @@ fun ProjectDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад",
-                            tint = Slate900
+                            contentDescription = strings.cancel,
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -108,8 +109,8 @@ fun ProjectDetailScreen(
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Меню проекта",
-                                tint = Slate900
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
 
@@ -118,7 +119,7 @@ fun ProjectDetailScreen(
                             onDismissRequest = { menuExpanded = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Переименовать") },
+                                text = { Text(strings.rename) },
                                 leadingIcon = {
                                     Icon(Icons.Default.Edit, contentDescription = null)
                                 },
@@ -128,7 +129,7 @@ fun ProjectDetailScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Удалить проект", color = RedPrimary) },
+                                text = { Text(strings.delete, color = RedPrimary) },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Delete,
@@ -161,7 +162,7 @@ fun ProjectDetailScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Загрузка проекта...", color = Slate500)
+                Text("...", color = Slate500)
             }
         } else {
             LazyColumn(
@@ -178,7 +179,7 @@ fun ProjectDetailScreen(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        border = BorderStroke(1.dp, BorderColor),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -188,9 +189,9 @@ fun ProjectDetailScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Баланс проекта",
+                                text = strings.projectBalance,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Slate500
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -204,7 +205,12 @@ fun ProjectDetailScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            BalanceBadge(balance = currentProject.balance)
+                            BalanceBadge(
+                                balance = currentProject.balance,
+                                profitText = strings.statusInProfit,
+                                lossText = strings.statusInLoss,
+                                zeroText = strings.statusInZero
+                            )
                         }
                     }
                 }
@@ -221,7 +227,7 @@ fun ProjectDetailScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
-                            border = BorderStroke(1.dp, BorderColor),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.weight(1f)
                         ) {
                             Column(
@@ -230,9 +236,9 @@ fun ProjectDetailScreen(
                                     .padding(16.dp)
                             ) {
                                 Text(
-                                    text = "Потрачено",
+                                    text = strings.spent,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Slate500
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
@@ -250,7 +256,7 @@ fun ProjectDetailScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
-                            border = BorderStroke(1.dp, BorderColor),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.weight(1f)
                         ) {
                             Column(
@@ -259,9 +265,9 @@ fun ProjectDetailScreen(
                                     .padding(16.dp)
                             ) {
                                 Text(
-                                    text = "Получено",
+                                    text = strings.received,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Slate500
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
@@ -281,7 +287,6 @@ fun ProjectDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Button "Потратил"
                         Button(
                             onClick = { viewModel.openAddExpenseDialog() },
                             colors = ButtonDefaults.buttonColors(
@@ -300,13 +305,12 @@ fun ProjectDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Потратил",
+                                text = strings.actionSpent,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        // Button "Получил"
                         Button(
                             onClick = { viewModel.openAddIncomeDialog() },
                             colors = ButtonDefaults.buttonColors(
@@ -325,7 +329,7 @@ fun ProjectDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Получил",
+                                text = strings.actionReceived,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -337,10 +341,10 @@ fun ProjectDetailScreen(
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "История операций",
+                        text = strings.operationsHistory,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
@@ -352,7 +356,7 @@ fun ProjectDetailScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
-                            border = BorderStroke(1.dp, BorderColor),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Box(
@@ -362,7 +366,7 @@ fun ProjectDetailScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Пока нет операций.\nНажмите «Потратил» или «Получил», чтобы добавить сумму.",
+                                    text = strings.emptyOperationsDesc,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Slate500,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -374,6 +378,8 @@ fun ProjectDetailScreen(
                     items(transactions, key = { it.id }) { item ->
                         TransactionRow(
                             transaction = item,
+                            spentLabel = strings.actionSpent,
+                            receivedLabel = strings.actionReceived,
                             onDelete = { viewModel.deleteTransaction(item.id) }
                         )
                     }
@@ -386,6 +392,11 @@ fun ProjectDetailScreen(
     uiState.addTransactionType?.let { initialType ->
         AddTransactionDialog(
             initialType = initialType,
+            spentLabel = strings.actionSpent,
+            receivedLabel = strings.actionReceived,
+            amountLabel = strings.amountLabel,
+            cancelLabel = strings.cancel,
+            errorMessageText = strings.enterValidAmount,
             onDismiss = { viewModel.dismissAddTransactionDialog() },
             onConfirm = { amount, type ->
                 viewModel.addTransaction(amount, type)
@@ -397,8 +408,8 @@ fun ProjectDetailScreen(
     if (uiState.isRenameDialogOpen && project != null) {
         AddEditProjectDialog(
             initialName = project!!.name,
-            title = "Переименовать проект",
-            confirmButtonText = "Сохранить",
+            title = strings.renameProject,
+            confirmButtonText = strings.save,
             onDismiss = { viewModel.dismissRenameDialog() },
             onConfirm = { newName -> viewModel.renameProject(newName) }
         )
@@ -407,9 +418,9 @@ fun ProjectDetailScreen(
     // Delete Confirmation Dialog
     if (uiState.isDeleteDialogOpen && project != null) {
         DeleteConfirmationDialog(
-            title = "Удалить «${project!!.name}»?",
-            message = "Все внесённые суммы по этому проекту будут безвозвратно удалены.",
-            confirmButtonText = "Удалить",
+            title = strings.deleteConfirmTitle(project!!.name),
+            message = strings.deleteConfirmMessage,
+            confirmButtonText = strings.delete,
             onDismiss = { viewModel.dismissDeleteDialog() },
             onConfirm = {
                 viewModel.confirmDelete(onDeleted = onBack)
@@ -421,6 +432,8 @@ fun ProjectDetailScreen(
 @Composable
 fun TransactionRow(
     transaction: TransactionEntity,
+    spentLabel: String,
+    receivedLabel: String,
     onDelete: () -> Unit
 ) {
     val isExpense = transaction.type == TransactionType.EXPENSE
@@ -430,7 +443,7 @@ fun TransactionRow(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, BorderColor),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -444,7 +457,6 @@ fun TransactionRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Circle icon badge
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -462,10 +474,10 @@ fun TransactionRow(
 
                 Column {
                     Text(
-                        text = if (isExpense) "Потратил" else "Получил",
+                        text = if (isExpense) spentLabel else receivedLabel,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -487,7 +499,7 @@ fun TransactionRow(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Удалить запись",
+                        contentDescription = "Delete",
                         tint = Slate400,
                         modifier = Modifier.size(18.dp)
                     )
