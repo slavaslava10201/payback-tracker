@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Учёт окупаемости проектов — Android App Preview</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen flex items-center justify-center p-4">
+
+  <!-- Mobile Device Shell -->
+  <div class="w-full max-w-md bg-slate-50 rounded-[36px] shadow-2xl border-[6px] border-slate-800 overflow-hidden flex flex-col h-[780px] relative">
+    
+    <!-- Status Bar Mockup -->
+    <div class="bg-slate-50 px-6 pt-3 pb-2 flex justify-between items-center text-xs font-semibold text-slate-600 select-none border-b border-slate-100">
+      <span>12:00</span>
+      <div class="w-20 h-4 bg-slate-800 rounded-full mx-auto"></div>
+      <div class="flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25l1.42 1.42.64-.64C7.93 20.26 9.88 21 12 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z"/></svg>
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5z"/></svg>
+        <span class="text-[10px]">100%</span>
+      </div>
+    </div>
+
+    <!-- APP CONTENT CONTAINER -->
+    <div id="app" class="flex-1 overflow-y-auto relative flex flex-col">
+      <!-- Injected by JavaScript -->
+    </div>
+
+    <!-- Home indicator bar -->
+    <div class="bg-slate-50 py-2 flex justify-center border-t border-slate-100">
+      <div class="w-28 h-1 bg-slate-400 rounded-full"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Initial State with sample demo data
+    const STORAGE_KEY = "payback_tracker_data_v1";
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try { return JSON.parse(saved); } catch(e){}
+      }
+      return [
+        {
+          id: 1,
+          name: "Кофейня ToGo",
+          transactions: [
+            { id: 1, amount: 250000, type: "EXPENSE" },
+            { id: 2, amount: 60000, type: "EXPENSE" },
+            { id: 3, amount: 180000, type: "INCOME" },
+            { id: 4, amount: 210000, type: "INCOME" }
+          ]
+        },
+        {
+          id: 2,
+          name: "Телеграм-канал",
+          transactions: [
+            { id: 5, amount: 45000, type: "EXPENSE" },
+            { id: 6, amount: 15000, type: "INCOME" }
+          ]
+        }
+      ];
+    }
+
+    let projects = loadData();
+    let currentProjectId = null;
+    let modalState = null; // { type: 'add_project' | 'rename_project' | 'delete_project' | 'add_transaction', ... }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+      render();
+    }
+
+    function formatNumber(num) {
+      return new Intl.NumberFormat('ru-RU').format(num) + ' ₽';
+    }
+
+    function formatBalance(bal) {
+      const sign = bal > 0 ? '+' : (bal < 0 ? '−' : '');
+      const absVal = Math.abs(bal);
+      return sign + ' ' + new Intl.NumberFormat('ru-RU').format(absVal) + ' ₽';
+    }
+
+    function getStats(project) {
+      let expense = 0;
+      let income = 0;
+      project.transactions.forEach(t => {
+        if (t.type === 'EXPENSE') expense += t.amount;
+        if (t.type === 'INCOME') income += t.amount;
+      });
+      return {
+        expense,
+        income,
+        balance: income - expense
+      };
+    }
+
+    function render() {
+      const app = document.getElementById("app");
+      if (currentProjectId === null) {
+        renderProjectList(app);
+      } else {
+        renderProjectDetail(app);
+      }
+      renderModal();
+    }
+
+    // SCREEN 1: Projects List
+    function renderProjectList(container) {
+      let html = `
+        <div class="px-5 py-4 flex items-center justify-between border-b border-slate-200 bg-white sticky top-0 z-10">
+          <div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Проекты</h1>
+            <p class="text-xs text-slate-500 font-medium">Учёт окупаемости</p>
+          </div>
+          <button onclick="openAddProjectModal()" class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800 transition active:scale-95 shadow">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          </button>
+        </div>
+
+        <div class="p-4 space-y-3 flex-1">
+      `;
+
+      if (projects.length === 0) {
+        html += `
+          <div class="h-96 flex flex-col items-center justify-center text-center px-4">
+            <div class="w-14 h-14 rounded-2xl bg-slate-200 text-slate-400 flex items-center justify-center mb-3">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"/></svg>
+            </div>
+            <p class="font-bold text-slate-800 text-lg">Нет проектов</p>
+            <p class="text-xs text-slate-500 mt-1 max-w-[220px]">Нажмите кнопку «+» вверху, чтобы добавить свой первый проект.</p>
+          </div>
+        `;
+      } else {
+        projects.forEach(p => {
+          const stats = getStats(p);
+          const isProfitable = stats.balance >= 0;
+          const balanceColor = isProfitable ? 'text-emerald-700' : 'text-rose-600';
+          const badgeClass = isProfitable ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+          const badgeText = isProfitable ? (stats.balance === 0 ? 'В нуле' : 'В плюсе') : 'В минусе';
+
+          html += `
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm hover:shadow transition cursor-pointer" onclick="openProject(${p.id})">
+              <div class="flex items-center justify-between mb-2">
+                <h2 class="font-bold text-slate-900 text-base truncate pr-2">${escapeHtml(p.name)}</h2>
+                <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+                  <button onclick="openRenameModal(${p.id})" title="Переименовать" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>
+                  </button>
+                  <button onclick="openDeleteModal(${p.id})" title="Удалить" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-baseline justify-between mt-1">
+                <div>
+                  <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Баланс</div>
+                  <div class="text-2xl font-black ${balanceColor} tracking-tight">${formatBalance(stats.balance)}</div>
+                </div>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-md ${badgeClass}">${badgeText}</span>
+              </div>
+
+              <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-500">
+                <span>Потрачено: <strong class="text-slate-700">${formatNumber(stats.expense)}</strong></span>
+                <span>Получено: <strong class="text-slate-700">${formatNumber(stats.income)}</strong></span>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      html += `</div>`;
+      container.innerHTML = html;
+    }
+
+    // SCREEN 2: Project Detail Screen
+    function renderProjectDetail(container) {
+      const project = projects.find(p => p.id === currentProjectId);
+      if (!project) {
+        currentProjectId = null;
+        render();
+        return;
+      }
+
+      const stats = getStats(project);
+      const isProfitable = stats.balance >= 0;
+      const balanceColor = isProfitable ? 'text-emerald-700' : 'text-rose-600';
+      const badgeClass = isProfitable ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+      const badgeText = isProfitable ? (stats.balance === 0 ? 'В нуле' : 'В плюсе') : 'В минусе';
+
+      let html = `
+        <!-- Top App Bar -->
+        <div class="px-4 py-3 flex items-center justify-between border-b border-slate-200 bg-white sticky top-0 z-10">
+          <div class="flex items-center gap-2 overflow-hidden">
+            <button onclick="currentProjectId = null; render();" class="p-1.5 -ml-1 text-slate-700 hover:bg-slate-100 rounded-full active:scale-95">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/></svg>
+            </button>
+            <h1 class="text-lg font-bold text-slate-900 truncate">${escapeHtml(project.name)}</h1>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="openRenameModal(${project.id})" class="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg" title="Переименовать">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"/></svg>
+            </button>
+            <button onclick="openDeleteModal(${project.id})" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg" title="Удалить">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 space-y-4 flex-1">
+          <!-- 1. Hero Balance Card -->
+          <div class="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm text-center">
+            <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Баланс проекта</span>
+            <div class="text-4xl font-black ${balanceColor} tracking-tight mt-1 mb-2">${formatBalance(stats.balance)}</div>
+            <span class="inline-block text-xs font-bold px-3 py-1 rounded-full ${badgeClass}">${badgeText}</span>
+          </div>
+
+          <!-- 2. Breakdown row -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
+              <span class="text-xs text-slate-500 font-medium">Потрачено</span>
+              <div class="text-xl font-bold text-rose-600 mt-1">${formatNumber(stats.expense)}</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm">
+              <span class="text-xs text-slate-500 font-medium">Получено</span>
+              <div class="text-xl font-bold text-emerald-700 mt-1">${formatNumber(stats.income)}</div>
+            </div>
+          </div>
+
+          <!-- 3. Action Buttons -->
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <button onclick="openAddTransactionModal('EXPENSE')" class="h-14 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold flex items-center justify-center gap-2 transition active:scale-95 shadow-sm">
+              <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/></svg>
+              <span>Потратил</span>
+            </button>
+
+            <button onclick="openAddTransactionModal('INCOME')" class="h-14 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold flex items-center justify-center gap-2 transition active:scale-95 shadow-sm">
+              <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+              <span>Получил</span>
+            </button>
+          </div>
+
+          <!-- 4. Operations List -->
+          <div class="pt-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">История операций</h3>
+      `;
+
+      if (project.transactions.length === 0) {
+        html += `
+          <div class="bg-white rounded-2xl p-6 border border-slate-200 text-center text-xs text-slate-400">
+            Пока нет операций.<br>Нажмите «Потратил» или «Получил» выше.
+          </div>
+        `;
+      } else {
+        html += `<div class="space-y-2">`;
+        // Show newest transactions first
+        const reversed = [...project.transactions].reverse();
+        reversed.forEach(t => {
+          const isExpense = t.type === 'EXPENSE';
+          const sign = isExpense ? '-' : '+';
+          const iconBg = isExpense ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700';
+          const amountColor = isExpense ? 'text-rose-600' : 'text-emerald-700';
+          const title = isExpense ? 'Потратил' : 'Получил';
+
+          html += `
+            <div class="bg-white rounded-xl px-4 py-3 border border-slate-200 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full ${iconBg} flex items-center justify-center font-bold text-sm">
+                  ${sign}
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-800">${title}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-base ${amountColor}">${sign}${formatNumber(t.amount)}</span>
+                <button onclick="deleteTransaction(${t.id})" class="p-1 text-slate-300 hover:text-slate-600 rounded">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // MODAL DIALOGS
+    function openAddProjectModal() {
+      modalState = { type: 'add_project' };
+      renderModal();
+    }
+
+    function openRenameModal(projectId) {
+      const p = projects.find(item => item.id === projectId);
+      if (!p) return;
+      modalState = { type: 'rename_project', projectId, currentName: p.name };
+      renderModal();
+    }
+
+    function openDeleteModal(projectId) {
+      const p = projects.find(item => item.id === projectId);
+      if (!p) return;
+      modalState = { type: 'delete_project', projectId, name: p.name };
+      renderModal();
+    }
+
+    function openAddTransactionModal(initialType) {
+      modalState = { type: 'add_transaction', txType: initialType };
+      renderModal();
+    }
+
+    function closeModal() {
+      modalState = null;
+      renderModal();
+    }
+
+    function renderModal() {
+      let modalContainer = document.getElementById("modal-root");
+      if (!modalContainer) {
+        modalContainer = document.createElement("div");
+        modalContainer.id = "modal-root";
+        document.body.appendChild(modalContainer);
+      }
+
+      if (!modalState) {
+        modalContainer.innerHTML = "";
+        return;
+      }
+
+      let content = "";
+
+      if (modalState.type === 'add_project') {
+        content = `
+          <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModal()">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-100" onclick="event.stopPropagation()">
+              <h3 class="text-xl font-bold text-slate-900 mb-1">Новый проект</h3>
+              <p class="text-xs text-slate-500 mb-4">Введите название вашего проекта</p>
+              <input id="projNameInput" type="text" placeholder="Например: Онлайн-курс" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm font-medium mb-5" autofocus />
+              <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-slate-600 font-medium text-sm hover:bg-slate-100">Отмена</button>
+                <button onclick="submitAddProject()" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm hover:bg-slate-800 shadow">Создать</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (modalState.type === 'rename_project') {
+        content = `
+          <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModal()">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-100" onclick="event.stopPropagation()">
+              <h3 class="text-xl font-bold text-slate-900 mb-1">Переименовать</h3>
+              <p class="text-xs text-slate-500 mb-4">Укажите новое название проекта</p>
+              <input id="projRenameInput" type="text" value="${escapeHtml(modalState.currentName)}" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm font-medium mb-5" autofocus />
+              <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-slate-600 font-medium text-sm hover:bg-slate-100">Отмена</button>
+                <button onclick="submitRenameProject(${modalState.projectId})" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm hover:bg-slate-800 shadow">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (modalState.type === 'delete_project') {
+        content = `
+          <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModal()">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-100" onclick="event.stopPropagation()">
+              <h3 class="text-xl font-bold text-slate-900 mb-2">Удалить «${escapeHtml(modalState.name)}»?</h3>
+              <p class="text-xs text-slate-500 mb-5 leading-relaxed">Все внесённые суммы (доходы и расходы) по этому проекту будут безвозвратно удалены.</p>
+              <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-slate-600 font-medium text-sm hover:bg-slate-100">Отмена</button>
+                <button onclick="submitDeleteProject(${modalState.projectId})" class="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-semibold text-sm hover:bg-rose-700 shadow">Удалить</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (modalState.type === 'add_transaction') {
+        const isExp = modalState.txType === 'EXPENSE';
+        content = `
+          <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeModal()">
+            <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-100" onclick="event.stopPropagation()">
+              <h3 class="text-xl font-bold text-slate-900 mb-3">${isExp ? 'Расход' : 'Доход'}</h3>
+
+              <!-- Type switch segment -->
+              <div class="bg-slate-100 p-1 rounded-xl flex gap-1 mb-4">
+                <button onclick="setModalTxType('EXPENSE')" class="flex-1 py-2 text-xs font-bold rounded-lg transition ${isExp ? 'bg-rose-100 text-rose-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'}">Потратил</button>
+                <button onclick="setModalTxType('INCOME')" class="flex-1 py-2 text-xs font-bold rounded-lg transition ${!isExp ? 'bg-emerald-100 text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-900'}">Получил</button>
+              </div>
+
+              <!-- Amount input -->
+              <div class="relative mb-5">
+                <input id="txAmountInput" type="number" step="any" min="0" placeholder="0" class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 ${isExp ? 'focus:ring-rose-500' : 'focus:ring-emerald-600'} text-lg font-bold pr-10" autofocus />
+                <span class="absolute right-4 top-3.5 text-slate-400 font-bold">₽</span>
+              </div>
+
+              <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2.5 rounded-xl text-slate-600 font-medium text-sm hover:bg-slate-100">Отмена</button>
+                <button onclick="submitAddTransaction()" class="px-5 py-2.5 rounded-xl ${isExp ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-700 hover:bg-emerald-800'} text-white font-semibold text-sm shadow">
+                  ${isExp ? '+ Потратил' : '+ Получил'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      modalContainer.innerHTML = content;
+      setTimeout(() => {
+        const inp = document.getElementById("projNameInput") || document.getElementById("projRenameInput") || document.getElementById("txAmountInput");
+        if (inp) inp.focus();
+      }, 50);
+    }
+
+    function setModalTxType(type) {
+      if (modalState && modalState.type === 'add_transaction') {
+        modalState.txType = type;
+        renderModal();
+      }
+    }
+
+    function submitAddProject() {
+      const input = document.getElementById("projNameInput");
+      const name = input ? input.value.trim() : "";
+      if (!name) return;
+      const newProj = {
+        id: Date.now(),
+        name,
+        transactions: []
+      };
+      projects.unshift(newProj);
+      closeModal();
+      saveData();
+    }
+
+    function submitRenameProject(id) {
+      const input = document.getElementById("projRenameInput");
+      const name = input ? input.value.trim() : "";
+      if (!name) return;
+      const p = projects.find(item => item.id === id);
+      if (p) {
+        p.name = name;
+        closeModal();
+        saveData();
+      }
+    }
+
+    function submitDeleteProject(id) {
+      projects = projects.filter(item => item.id !== id);
+      if (currentProjectId === id) currentProjectId = null;
+      closeModal();
+      saveData();
+    }
+
+    function submitAddTransaction() {
+      const input = document.getElementById("txAmountInput");
+      const val = parseFloat(input ? input.value : 0);
+      if (!val || val <= 0) return;
+      const p = projects.find(item => item.id === currentProjectId);
+      if (p) {
+        p.transactions.push({
+          id: Date.now(),
+          amount: val,
+          type: modalState.txType
+        });
+        closeModal();
+        saveData();
+      }
+    }
+
+    function deleteTransaction(txId) {
+      const p = projects.find(item => item.id === currentProjectId);
+      if (p) {
+        p.transactions = p.transactions.filter(t => t.id !== txId);
+        saveData();
+      }
+    }
+
+    function openProject(id) {
+      currentProjectId = id;
+      render();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
